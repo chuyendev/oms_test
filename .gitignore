@@ -7,3 +7,4 @@ node_modules
 __pycache__
 
 frontend/dev-dist
+frontend/node_modules
