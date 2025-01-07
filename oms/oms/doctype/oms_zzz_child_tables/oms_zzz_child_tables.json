@@ -1,0 +1,51 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-12-09 18:08:22.864838",
+ "doctype": "DocType",
+ "editable_grid": 1,
+ "engine": "InnoDB",
+ "field_order": [
+  "setionsafsdg",
+  "columnfgds",
+  "first_name",
+  "column_break_yedsfds",
+  "last_name"
+ ],
+ "fields": [
+  {
+   "fieldname": "first_name",
+   "fieldtype": "Data",
+   "label": "H\u1ecd"
+  },
+  {
+   "fieldname": "last_name",
+   "fieldtype": "Data",
+   "label": "T\u00ean"
+  },
+  {
+   "fieldname": "setionsafsdg",
+   "fieldtype": "Section Break"
+  },
+  {
+   "fieldname": "columnfgds",
+   "fieldtype": "Column Break"
+  },
+  {
+   "fieldname": "column_break_yedsfds",
+   "fieldtype": "Column Break"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "istable": 1,
+ "links": [],
+ "modified": "2024-12-09 18:08:43.940153",
+ "modified_by": "Administrator",
+ "module": "oms",
+ "name": "oms_zzz_child_tables",
+ "owner": "Administrator",
+ "permissions": [],
+ "sort_field": "creation",
+ "sort_order": "DESC",
+ "states": []
+}

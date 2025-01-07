@@ -1,0 +1,142 @@
+{
+ "actions": [],
+ "allow_rename": 1,
+ "creation": "2024-12-09 17:14:45.478050",
+ "doctype": "DocType",
+ "engine": "InnoDB",
+ "field_order": [
+  "section_break_abc",
+  "column_break_abc",
+  "ho_va_ten",
+  "kieu_check",
+  "kieu_datetime",
+  "kieu_int",
+  "kieu_rating",
+  "kieu_text_editor",
+  "kieu_attach",
+  "child_table",
+  "column_break_fhhj",
+  "kieu_date",
+  "kieu_float",
+  "kieu_select",
+  "kieu_small_text",
+  "kieu_text",
+  "kieu_link"
+ ],
+ "fields": [
+  {
+   "fieldname": "section_break_abc",
+   "fieldtype": "Section Break",
+   "label": "Demo"
+  },
+  {
+   "fieldname": "column_break_abc",
+   "fieldtype": "Column Break",
+   "label": "Demo"
+  },
+  {
+   "fieldname": "ho_va_ten",
+   "fieldtype": "Data",
+   "in_standard_filter": 1,
+   "label": "H\u1ecd v\u00e0 T\u00ean"
+  },
+  {
+   "default": "0",
+   "fieldname": "kieu_check",
+   "fieldtype": "Check",
+   "label": "Ki\u1ec3u check"
+  },
+  {
+   "fieldname": "kieu_datetime",
+   "fieldtype": "Datetime",
+   "label": "Ki\u1ec3u datetime"
+  },
+  {
+   "fieldname": "kieu_int",
+   "fieldtype": "Int",
+   "label": "Ki\u1ec3u Int"
+  },
+  {
+   "fieldname": "kieu_rating",
+   "fieldtype": "Rating",
+   "label": "Ki\u1ec3u rating"
+  },
+  {
+   "fieldname": "kieu_text_editor",
+   "fieldtype": "Text Editor",
+   "label": "ki\u1ec3u text editor"
+  },
+  {
+   "fieldname": "kieu_attach",
+   "fieldtype": "Attach",
+   "label": "ki\u1ec3u attach"
+  },
+  {
+   "fieldname": "child_table",
+   "fieldtype": "Table",
+   "label": "B\u1ea3ng con",
+   "options": "oms_zzz_child_tables"
+  },
+  {
+   "fieldname": "column_break_fhhj",
+   "fieldtype": "Column Break",
+   "label": "Demo 2"
+  },
+  {
+   "fieldname": "kieu_date",
+   "fieldtype": "Date",
+   "label": "Ki\u1ec3u date"
+  },
+  {
+   "fieldname": "kieu_float",
+   "fieldtype": "Float",
+   "label": "Ki\u1ec3u Float"
+  },
+  {
+   "fieldname": "kieu_select",
+   "fieldtype": "Select",
+   "label": "Ki\u1ec3u select",
+   "options": "1\n2\n3\n4\n5"
+  },
+  {
+   "fieldname": "kieu_small_text",
+   "fieldtype": "Small Text",
+   "label": "Ki\u1ec3u small text"
+  },
+  {
+   "fieldname": "kieu_text",
+   "fieldtype": "Text",
+   "label": "Ki\u1ec3u text"
+  },
+  {
+   "fieldname": "kieu_link",
+   "fieldtype": "Link",
+   "label": "Ki\u1ec3u Link",
+   "options": "User"
+  }
+ ],
+ "index_web_pages_for_search": 1,
+ "links": [],
+ "modified": "2024-12-09 18:21:06.108642",
+ "modified_by": "Administrator",
+ "module": "oms",
+ "name": "oms_zzz",
+ "owner": "Administrator",
+ "permissions": [
+  {
+   "create": 1,
+   "delete": 1,
+   "email": 1,
+   "export": 1,
+   "print": 1,
+   "read": 1,
+   "report": 1,
+   "role": "System Manager",
+   "share": 1,
+   "write": 1
+  }
+ ],
+ "sort_field": "modified",
+ "sort_order": "DESC",
+ "states": []
+}
