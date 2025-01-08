@@ -12,6 +12,7 @@ from frappe.utils import make_filter_tuple
 from frappe.permissions import get_role_permissions
 from oms.api.views import get_views
 from oms.oms.doctype.oms_form_script.oms_form_script import get_form_script
+from oms.api.ultis import default_list_data, get_options_from_doctype, custom_fields_config
 
 import openpyxl
 from frappe.utils.file_manager import save_file
@@ -174,10 +175,9 @@ def get_list_data(
 
 	is_default = True
 	data = []
-	_list = get_controller(doctype)
 	default_rows = []
-	if hasattr(_list, "default_list_data"):
-		default_rows = _list.default_list_data().get("rows")
+	if default_list_data(doctype):
+		default_rows = default_list_data(doctype).get("rows")
 
 	if view_type != "kanban":
 		if columns or rows:
@@ -207,9 +207,9 @@ def get_list_data(
 		# 	columns = frappe.parse_json(list_view_settings.columns)
 		# 	rows = frappe.parse_json(list_view_settings.rows)
 		# 	is_default = False
-		if not custom_view or is_default and hasattr(_list, "default_list_data"):
+		if not custom_view or is_default and default_list_data(doctype):
 			rows = default_rows
-			columns = _list.default_list_data().get("columns")
+			columns = default_list_data(doctype).get("columns")
 
 		# check if rows has all keys from columns if not add them
 		for column in columns:
@@ -276,11 +276,11 @@ def get_list_data(
 		"page_length": page_length,
 		"page_length_count": page_length_count,
 		"is_default": is_default,
-		"views": get_views(doctype),
+		# "views": get_views(doctype),
 		"total_count": len(frappe.get_list(doctype, filters=filters)),
 		"row_count": len(data),
-		"form_script": get_form_script(doctype),
-		"list_script": get_form_script(doctype, "List"),
+		# "form_script": get_form_script(doctype),
+		# "list_script": get_form_script(doctype, "List"),
 		"view_type": view_type,
 	}
 @frappe.whitelist()
@@ -302,122 +302,129 @@ def get_quick_filters(doctype: str):
 			"options": field.options,
 		})
 
-	# if doctype == "oms_yyy":
-	# 	quick_filters = [filter for filter in quick_filters if filter.get("employee_name") != "converted"]
+	if doctype == "Sales Order":
+		quick_filters = [filter for filter in quick_filters if filter.get("name") != "designation"]
+	
+	# Thêm các trường tùy chỉnh từ custom_fields_config nếu doctype nằm trong cấu hình
+	if doctype in custom_fields_config:
+		quick_filters.extend(custom_fields_config[doctype])
+  
+	# Đảm bảo "ID" luôn đứng đầu trong danh sách quick_filters
+	quick_filters = sorted(quick_filters, key=lambda x: x["name"] != "name")
 
 	return quick_filters
 
 # Hàm lấy all field trong doctype (Sử dụng khi trong doctype đó có chia làm các tab)
 @frappe.whitelist()
 def get_value_modal(doctype):
-    # Lấy danh sách tất cả các field trong doctype
-    fields = frappe.get_meta(doctype).fields
-    list_infor_column = []
-    
-    current_tab = None
-    current_section = None
-    current_column = None
+	# Lấy danh sách tất cả các field trong doctype
+	fields = frappe.get_meta(doctype).fields
+	list_infor_column = []
+	
+	current_tab = None
+	current_section = None
+	current_column = None
 
-    for field in fields:
-        # Fix lại và bổ sung những trường nào type là 'Attach Image', 'Table' thì không hiển thị
-        if field.fieldtype in ['Attach Image']:
-            continue
-        if field.name == 'title' :
-            continue
-        if field.fieldtype == 'Tab Break':
-            # Thêm tab trước đó nếu có
-            if current_tab:
-                if current_section:  # Thêm section trước đó nếu có
-                    if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
-                        current_section['columns'].append(current_column)
-                    current_tab['sections'].append(current_section)
-                list_infor_column.append(current_tab)
+	for field in fields:
+		# Fix lại và bổ sung những trường nào type là 'Attach Image', 'Table' thì không hiển thị
+		if field.fieldtype in ['Attach Image']:
+			continue
+		if field.name == 'title' :
+			continue
+		if field.fieldtype == 'Tab Break':
+			# Thêm tab trước đó nếu có
+			if current_tab:
+				if current_section:  # Thêm section trước đó nếu có
+					if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
+						current_section['columns'].append(current_column)
+					current_tab['sections'].append(current_section)
+				list_infor_column.append(current_tab)
 
-            # Tạo tab mới
-            current_tab = {
-                'label': field.label or field.name or 'Untitled',
-                "name": field.label or field.name or 'Untitled',
-                'sections': []
-            }
-            current_section = None  # Reset section và column khi tạo tab mới
-            current_column = None
+			# Tạo tab mới
+			current_tab = {
+				'label': field.label or field.name or 'Untitled',
+				"name": field.label or field.name or 'Untitled',
+				'sections': []
+			}
+			current_section = None  # Reset section và column khi tạo tab mới
+			current_column = None
 
-        elif field.fieldtype == 'Section Break':
-            # Thêm section trước đó vào tab hiện tại
-            if current_section:
-                if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
-                    current_section['columns'].append(current_column)
-                current_tab['sections'].append(current_section)
+		elif field.fieldtype == 'Section Break':
+			# Thêm section trước đó vào tab hiện tại
+			if current_section:
+				if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
+					current_section['columns'].append(current_column)
+				current_tab['sections'].append(current_section)
 
-            # Tạo section mới
-            current_section = {
-                'label': field.label,
-                'columns': []
-            }
-            current_column = None  # Reset column khi tạo section mới
+			# Tạo section mới
+			current_section = {
+				'label': field.label,
+				'columns': []
+			}
+			current_column = None  # Reset column khi tạo section mới
 
-        elif field.fieldtype == 'Column Break':
-            # Thêm column trước đó vào section hiện tại
-            if current_column:
-                current_section['columns'].append(current_column)
+		elif field.fieldtype == 'Column Break':
+			# Thêm column trước đó vào section hiện tại
+			if current_column:
+				current_section['columns'].append(current_column)
 
-            # Tạo column mới
-            current_column = {
-                'fields': []
-            }
+			# Tạo column mới
+			current_column = {
+				'fields': []
+			}
 
-        elif current_tab and current_section and field.label:  # Chỉ xử lý nếu field có label hợp lệ
+		elif current_tab and current_section and field.label:  # Chỉ xử lý nếu field có label hợp lệ
 
-            # Tạo dữ liệu của field
-            field_data = {
-                'label': _(field.label),
-                
-                'name': field.fieldname,
-                'type': field.fieldtype,
-                'options': field.options,
-                'mandatory': field.reqd,
-                "placeholder": field.label,
-                "read_only": field.read_only,
-                'hidden' : field.hidden,
-                'default': field.default,
-                "mandatory_depends_on": field.mandatory_depends_on,
-                "read_only_depends_on": field.read_only_depends_on,
-                "depends_on": field.depends_on,
-                "all_properties": field,
+			# Tạo dữ liệu của field
+			field_data = {
+				'label': _(field.label),
+				
+				'name': field.fieldname,
+				'type': field.fieldtype,
+				'options': field.options,
+				'mandatory': field.reqd,
+				"placeholder": field.label,
+				"read_only": field.read_only,
+				'hidden' : field.hidden,
+				'default': field.default,
+				"mandatory_depends_on": field.mandatory_depends_on,
+				"read_only_depends_on": field.read_only_depends_on,
+				"depends_on": field.depends_on,
+				"all_properties": field,
 				# "link_filters": field.get("link_filters"),
 				# "placeholder": field.get("placeholder"),
-            }
-          
-            
+			}
+		  
+			
 
-            # Nếu field là 'Select', xử lý options
-            if field.fieldtype == "Select" and field.options:
-                options = field.options.split("\n")
-                field_data['options'] = [{"label": option, "value": option} for option in options]
-                field_data['options'].insert(0, {"label": "", "value": ""})
+			# Nếu field là 'Select', xử lý options
+			if field.fieldtype == "Select" and field.options:
+				options = field.options.split("\n")
+				field_data['options'] = [{"label": option, "value": option} for option in options]
+				field_data['options'].insert(0, {"label": "", "value": ""})
 
-            # Thêm field vào column hiện tại
-            if current_column:
-                current_column['fields'].append(field_data)
-            else:
-                # Nếu chưa có column thì tạo column đầu tiên trong section
-                current_column = {
-                    'fields': [field_data]
-                }
+			# Thêm field vào column hiện tại
+			if current_column:
+				current_column['fields'].append(field_data)
+			else:
+				# Nếu chưa có column thì tạo column đầu tiên trong section
+				current_column = {
+					'fields': [field_data]
+				}
 
-    # Thêm column cuối cùng vào section nếu có
-    if current_column and current_section:
-        current_section['columns'].append(current_column)
+	# Thêm column cuối cùng vào section nếu có
+	if current_column and current_section:
+		current_section['columns'].append(current_column)
 
-    # Thêm section cuối cùng vào tab nếu có
-    if current_section and current_tab:
-        current_tab['sections'].append(current_section)
+	# Thêm section cuối cùng vào tab nếu có
+	if current_section and current_tab:
+		current_tab['sections'].append(current_section)
 
-    # Thêm tab cuối cùng vào danh sách nếu có
-    if current_tab:
-        list_infor_column.append(current_tab)
+	# Thêm tab cuối cùng vào danh sách nếu có
+	if current_tab:
+		list_infor_column.append(current_tab)
 
-    return list_infor_column
+	return list_infor_column
 
 
 # Hàm lấy all field trong doctype (Sử dụng khi trong doctype đó không có chia làm các tab)
@@ -468,17 +475,17 @@ def get_column_doctype(doctype: str):
 			# Tạo dữ liệu của field
 			field_data = {
 				'label': _(field.label),
-                'name': field.fieldname,
-                'type': field.fieldtype,
-                'options': field.options,
-                'mandatory': field.reqd,
-                "placeholder": field.label,
-                "read_only": field.read_only,
-                'default': field.default,
-                "mandatory_depends_on": field.mandatory_depends_on,
-                "read_only_depends_on": field.read_only_depends_on,
-                "depends_on": field.depends_on,
-                "all_properties": field,
+				'name': field.fieldname,
+				'type': field.fieldtype,
+				'options': field.options,
+				'mandatory': field.reqd,
+				"placeholder": field.label,
+				"read_only": field.read_only,
+				'default': field.default,
+				"mandatory_depends_on": field.mandatory_depends_on,
+				"read_only_depends_on": field.read_only_depends_on,
+				"depends_on": field.depends_on,
+				"all_properties": field,
 			}
 
 			# Nếu field là 'Select', xử lý options
@@ -508,65 +515,65 @@ def get_column_doctype(doctype: str):
 
 @frappe.whitelist()
 def get_field_doctype(doctype):
-    # Lấy danh sách tất cả các field trong doctype
-    fields = frappe.get_meta(doctype).fields
-    return fields
-     
+	# Lấy danh sách tất cả các field trong doctype
+	fields = frappe.get_meta(doctype).fields
+	return fields
+	 
 @frappe.whitelist()
 def create_yyy_record(data):
-    """
-    Tạo mới bản ghi yyy trong doctype oms_yyy
-    :param data: Dữ liệu của bản ghi (json)
-    """
-    try:
-        # Chuyển dữ liệu JSON thành đối tượng dictionary
-        employee_data = frappe.parse_json(data)
+	"""
+	Tạo mới bản ghi yyy trong doctype oms_yyy
+	:param data: Dữ liệu của bản ghi (json)
+	"""
+	try:
+		# Chuyển dữ liệu JSON thành đối tượng dictionary
+		employee_data = frappe.parse_json(data)
 
-        # Lấy metadata của Doctype (lấy tất cả các trường)
-        doc_meta = frappe.get_meta("oms_yyy")
-        doc_fields = doc_meta.fields
+		# Lấy metadata của Doctype (lấy tất cả các trường)
+		doc_meta = frappe.get_meta("oms_yyy")
+		doc_fields = doc_meta.fields
 
-        # Tạo dictionary chứa dữ liệu cho việc tạo document
-        new_employee_data = {
-            "doctype": "oms_yyy"
-        }
+		# Tạo dictionary chứa dữ liệu cho việc tạo document
+		new_employee_data = {
+			"doctype": "oms_yyy"
+		}
 
-        # Kiểm tra các trường bắt buộc và thêm dữ liệu vào new_employee_data
-        for field in doc_fields:
-            fieldname = field.fieldname
+		# Kiểm tra các trường bắt buộc và thêm dữ liệu vào new_employee_data
+		for field in doc_fields:
+			fieldname = field.fieldname
 
-            # Kiểm tra nếu dữ liệu đã được gửi từ frontend
-            if fieldname in employee_data:
-                new_employee_data[fieldname] = employee_data[fieldname]
+			# Kiểm tra nếu dữ liệu đã được gửi từ frontend
+			if fieldname in employee_data:
+				new_employee_data[fieldname] = employee_data[fieldname]
 
-            # Kiểm tra các trường bắt buộc (is_mandatory)
-            # elif field.reqd:
-            #     if not employee_data.get(fieldname):
-            #         return {
-            #             "status": "error",
-            #             "message": _("Field {0} is mandatory").format(fieldname)
-            #         }
+			# Kiểm tra các trường bắt buộc (is_mandatory)
+			# elif field.reqd:
+			#     if not employee_data.get(fieldname):
+			#         return {
+			#             "status": "error",
+			#             "message": _("Field {0} is mandatory").format(fieldname)
+			#         }
 
-        # Tạo bản ghi mới trong doctype oms_yyy
-        new_employee = frappe.get_doc(new_employee_data)
+		# Tạo bản ghi mới trong doctype oms_yyy
+		new_employee = frappe.get_doc(new_employee_data)
 
-        # Lưu bản ghi
-        new_employee.insert()
-        frappe.db.commit()
+		# Lưu bản ghi
+		new_employee.insert()
+		frappe.db.commit()
 
-        return {
-            "status": "success",
-            "message": _("Employee record created successfully"),
-            "employee_name": new_employee.name
-        }
+		return {
+			"status": "success",
+			"message": _("Employee record created successfully"),
+			"employee_name": new_employee.name
+		}
 
-    except Exception as e:
-        frappe.log_error(frappe.get_traceback(), "yyy Creation Error")
-        return {
-            "status": "error",
-            "message": str(e)
-        }
-        
+	except Exception as e:
+		frappe.log_error(frappe.get_traceback(), "yyy Creation Error")
+		return {
+			"status": "error",
+			"message": str(e)
+		}
+		
 @frappe.whitelist()
 def get_fields_meta(doctype, restricted_fieldtypes=None, as_array=False):
 	not_allowed_fieldtypes = [
@@ -620,24 +627,24 @@ def get_fields_meta(doctype, restricted_fieldtypes=None, as_array=False):
 # Hàm check quyền của một user đang đăng nhập
 @frappe.whitelist()
 def check_user_permissions(doctype):
-    user = frappe.session.user  # Lấy người dùng hiện tại
-    roles = frappe.get_roles(user)  # Lấy các vai trò của người dùng
-    
-    # Tạo một đối tượng Meta cho DocType để dùng với hàm get_role_permissions
-    meta = frappe.get_meta(doctype)
+	user = frappe.session.user  # Lấy người dùng hiện tại
+	roles = frappe.get_roles(user)  # Lấy các vai trò của người dùng
+	
+	# Tạo một đối tượng Meta cho DocType để dùng với hàm get_role_permissions
+	meta = frappe.get_meta(doctype)
 
-    # Lấy quyền chi tiết dựa trên vai trò từ hàm get_role_permissions
-    role_permissions = get_role_permissions(meta, user=user)
+	# Lấy quyền chi tiết dựa trên vai trò từ hàm get_role_permissions
+	role_permissions = get_role_permissions(meta, user=user)
 
-    # Khởi tạo biến lưu kết quả cuối cùng về quyền của người dùng trên DocType
-    user_permissions = {
-        "can_read": bool(role_permissions.get("read")),
-        "can_write": bool(role_permissions.get("write")),
-        "can_create": bool(role_permissions.get("create")),
-        "can_delete": bool(role_permissions.get("delete"))
-    }
+	# Khởi tạo biến lưu kết quả cuối cùng về quyền của người dùng trên DocType
+	user_permissions = {
+		"can_read": bool(role_permissions.get("read")),
+		"can_write": bool(role_permissions.get("write")),
+		"can_create": bool(role_permissions.get("create")),
+		"can_delete": bool(role_permissions.get("delete"))
+	}
    
-    return role_permissions
+	return role_permissions
 
 
 @frappe.whitelist()
@@ -687,43 +694,43 @@ def get_sidebar_fields(doctype, name):
 	return layout
 
 def get_field_obj(field):
-    obj = {
-        "label": field.label,
-        "type": get_type(field),
-        "name": field.fieldname,
-        "hidden": field.hidden,
-        "reqd": field.reqd,
-        "read_only": field.read_only,
-        "all_properties": field,
-    }
+	obj = {
+		"label": field.label,
+		"type": get_type(field),
+		"name": field.fieldname,
+		"hidden": field.hidden,
+		"reqd": field.reqd,
+		"read_only": field.read_only,
+		"all_properties": field,
+	}
 
-    obj["placeholder"] = field.get("placeholder") or "Add " + field.label + "..."
+	obj["placeholder"] = field.get("placeholder") or "Add " + field.label + "..."
 
-    if field.fieldtype == "Link":
-        obj["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
-        obj["doctype"] = field.options
-    elif field.fieldtype == "Select" and field.options:
-        obj["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
-        obj["options"] = [{"label": option, "value": option} for option in field.options.split("\n")]
+	if field.fieldtype == "Link":
+		obj["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
+		obj["doctype"] = field.options
+	elif field.fieldtype == "Select" and field.options:
+		obj["placeholder"] = field.get("placeholder") or "Select " + field.label + "..."
+		obj["options"] = [{"label": option, "value": option} for option in field.options.split("\n")]
 
-    if field.read_only:
-        obj["tooltip"] = "This field is read only and cannot be edited."
+	if field.read_only:
+		obj["tooltip"] = "This field is read only and cannot be edited."
 
-    return obj
+	return obj
 def get_type(field):
-    if field.fieldtype == "Data" and field.options == "Phone":
-        return "phone"
-    elif field.fieldtype == "Data" and field.options == "Email":
-        return "email"
-    elif field.fieldtype == "Check":
-        return "checkbox"
-    elif field.fieldtype == "Int":
-        return "number"
-    elif field.fieldtype in ["Small Text", "Text", "Long Text"]:
-        return "textarea"
-    elif field.read_only:
-        return "read_only"
-    return field.fieldtype.lower()
+	if field.fieldtype == "Data" and field.options == "Phone":
+		return "phone"
+	elif field.fieldtype == "Data" and field.options == "Email":
+		return "email"
+	elif field.fieldtype == "Check":
+		return "checkbox"
+	elif field.fieldtype == "Int":
+		return "number"
+	elif field.fieldtype in ["Small Text", "Text", "Long Text"]:
+		return "textarea"
+	elif field.read_only:
+		return "read_only"
+	return field.fieldtype.lower()
 
 def get_assigned_users(doctype, name, default_assigned_to=None):
 	assigned_users = frappe.get_all(
@@ -792,69 +799,71 @@ def get_group_by_fields(doctype: str):
 
 
 @frappe.whitelist()
-def get_value_modal_no_tab(doctype):
-	 # Lấy danh sách tất cả các field trong doctype
+def get_value_modal(doctype):
+	# Lấy danh sách tất cả các field trong doctype
 	fields = frappe.get_meta(doctype).fields
-	list_infor_column = []
-	
+	info_columns = []
+
 	current_tab = None
 	current_section = None
 	current_column = None
 
+	# Helper function to create a default tab if needed
+	def create_default_tab():
+		return {
+			'label': 'Details',
+			'name': 'details',
+			'sections': []
+		}
+
+	# function to check if a label exists in a list
+	def label_exists_in_list(label, container):
+		return any(item.get('label') == label for item in container)
+
 	for field in fields:
-		# Bỏ qua các loại field không cần thiết
-		# if field.fieldtype in ['Attach Image']:
-		# 	continue
 		if field.name == 'title':
 			continue
 
 		if field.fieldtype == 'Tab Break':
-			# Thêm tab trước đó nếu có
 			if current_tab:
-				if current_section:  # Thêm section trước đó nếu có
-					if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
+				if current_section:
+					if current_column:
 						current_section['columns'].append(current_column)
-					current_tab['sections'].append(current_section)
-				list_infor_column.append(current_tab)
+					if current_section.get('label') and not label_exists_in_list(current_section.get('label', ''), current_tab['sections']):
+						current_tab['sections'].append(current_section)
+				if current_tab.get('label') and not label_exists_in_list(current_tab.get('label', ''), info_columns):
+					info_columns.append(current_tab)
 
-			# Tạo tab mới
 			current_tab = {
 				'label': field.label or field.name or 'Untitled',
-				"name": field.label or field.name or 'Untitled',
+				'name': field.label or field.name or 'Untitled',
 				'sections': []
 			}
-			current_section = None  # Reset section và column khi tạo tab mới
+			current_section = None
 			current_column = None
 
 		elif field.fieldtype == 'Section Break':
-			# Nếu không có tab hiện tại, tạo section ở cấp cao nhất
-			if current_section:
-				if current_column:  # Thêm column cuối cùng vào section trước đó nếu có
-					current_section['columns'].append(current_column)
-				if current_tab:  # Nếu có tab, thêm section vào tab
-					current_tab['sections'].append(current_section)
-				else:  # Nếu không có tab, thêm section trực tiếp vào danh sách
-					list_infor_column.append(current_section)
+			if not current_tab:
+				current_tab = create_default_tab()
+				if current_tab.get('label') and not label_exists_in_list(current_tab.get('label', ''), info_columns):
+					info_columns.append(current_tab)
 
-			# Tạo section mới
-			current_section = {
-				'label': field.label,
-				'columns': []
-			}
-			current_column = None  # Reset column khi tạo section mới
+			if current_section:
+				if current_column:
+					current_section['columns'].append(current_column)
+				if current_section.get('label') and not label_exists_in_list(current_section.get('label', ''), current_tab['sections']):
+					current_tab['sections'].append(current_section)
+
+			current_section = {'label': field.label or '', 'columns': []}
+			current_column = None
 
 		elif field.fieldtype == 'Column Break':
-			# Thêm column trước đó vào section hiện tại nếu có
-			if current_column and current_section:
+			if current_column:
 				current_section['columns'].append(current_column)
 
-			# Tạo column mới
-			current_column = {
-				'fields': []
-			}
+			current_column = {'fields': []}
 
-		elif field.label:  # Chỉ xử lý nếu field có label hợp lệ
-			# Tạo dữ liệu của field
+		elif field.label:
 			field_data = {
 				'label': _(field.label),
 				'name': field.fieldname,
@@ -863,36 +872,71 @@ def get_value_modal_no_tab(doctype):
 				'mandatory': field.reqd,
 				"placeholder": field.label,
 				"read_only": field.read_only,
+				"hidden": field.hidden,
+				"allow_on_submit": field.allow_on_submit,
 				"all_properties": field,
 			}
-			
-			# Nếu field là 'Select', xử lý options
 			if field.fieldtype == "Select" and field.options:
 				options = field.options.split("\n")
-				field_data['options'] = [{"label": option, "value": option} for option in options]
+				field_data['options'] = [
+					{"label": option, "value": option} for option in options]
 				field_data['options'].insert(0, {"label": "", "value": ""})
 
-			# Thêm field vào column hiện tại
+			if not current_tab:
+				current_tab = create_default_tab()
+				if current_tab.get('label') and not label_exists_in_list(current_tab.get('label', ''), info_columns):
+					info_columns.append(current_tab)
+
+			if not current_section:
+				current_section = {'label': '', 'columns': []}
+				if current_section.get('label') and not label_exists_in_list(current_section.get('label', ''), current_tab['sections']):
+					current_tab['sections'].append(current_section)
+
 			if current_column:
 				current_column['fields'].append(field_data)
 			else:
-				# Nếu chưa có column thì tạo column đầu tiên trong section
-				current_column = {
-					'fields': [field_data]
-				}
-# Thêm column cuối cùng vào section nếu có
+				current_column = {'fields': [field_data]}
+
 	if current_column and current_section:
 		current_section['columns'].append(current_column)
-
-	# Thêm section cuối cùng vào tab nếu có
-	if current_section:
-		if current_tab:  # Nếu có tab, thêm section vào tab
+	if current_section and current_tab:
+		# Hiện tại chỉ đang lấy những object có key 'label' có giá trị (Lưu ý đoạn này)
+		if current_section.get('label') and not label_exists_in_list(current_section.get('label', ''), current_tab['sections']):
 			current_tab['sections'].append(current_section)
-		else:  # Nếu không có tab, thêm section trực tiếp vào danh sách
-			list_infor_column.append(current_section)
-
-	# Thêm tab cuối cùng vào danh sách nếu có
 	if current_tab:
-		list_infor_column.append(current_tab)
+		if current_tab.get('label') and not label_exists_in_list(current_tab.get('label', ''), info_columns):
+			info_columns.append(current_tab)
 
-	return list_infor_column
+	return info_columns
+
+@frappe.whitelist()
+def get_sales_order(name):
+	Requisition = frappe.qb.DocType("Sales Order")
+
+	query = frappe.qb.from_(Requisition).select("*").where(Requisition.name == name).limit(1)
+
+	requisition = query.run(as_dict=True)
+	if not len(requisition):
+		frappe.throw(_("Sales Order not found"), frappe.DoesNotExistError)
+	requisition = requisition.pop()
+
+	requisition["doctype"] = "Sales Order"
+	requisition["fields_meta"] = get_fields_meta("Sales Order")
+	requisition["_form_script"] = get_form_script('Sales Order')
+	# requisition["_assign"] = get_assigned_users("Job Opening", requisition.name, requisition.owner)
+
+	return requisition
+
+@frappe.whitelist()
+def getdoc(doctype, name):
+	if not frappe.db.exists(doctype, name):
+		frappe.throw(_("doctype not found"), frappe.DoesNotExistError)
+	doc = frappe.get_doc(doctype, name).as_dict()
+
+	rs = {
+		"doc": doc,
+		"docinfo": {
+			"fields_meta": get_fields_meta(doctype)
+		}
+	}
+	return rs

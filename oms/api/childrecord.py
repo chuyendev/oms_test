@@ -145,49 +145,62 @@ def update_child_record(parent_doctype, parent_name, child_table_field, child_na
 	return {"status": "success", "message": f"Updated {child_table_field} with name {child_name}"}
 
 @frappe.whitelist()
-def get_dynamic_data(doctype, parent_name, parenttype, fields=None):
-	# Nếu không có fields, lấy tất cả các trường, nếu có field thì chuyển dạng nếu k sẽ rất dễ lỗi
-	if not fields:
-		fields = [d.fieldname for d in frappe.get_meta(doctype).fields]
-	else:
-		# vô cùng quan trọng này
-		fields = frappe.parse_json(fields)   
-	if 'name' not in fields:
-		fields.append('name')  # Thêm trường 'name' nếu chưa có 
+def get_dynamic_data(parent_name, parenttype):
+	"""
+	Lấy dữ liệu từ tất cả các bảng con của một Doctype cha.
 
-	# Lấy các bản ghi từ Doctype con, sử dụng parent và parenttype
-	records = frappe.get_all(
-		doctype,
-		filters={"parent": parent_name, "parenttype": parenttype},  # Đảm bảo sử dụng cả parent và parenttype
-		fields=fields
-	)
+	:param doctype: Tên của Doctype (không sử dụng trong hàm này).
+	:param parent_name: ID của bản ghi Doctype cha.
+	:param parenttype: Tên của Doctype cha.
+	:return: Danh sách chứa thông tin `columns`, `rows` và `child_fieldname` của tất cả bảng con.
+	"""
+	# Lấy meta thông tin của Doctype cha để xác định các bảng con
+	meta = frappe.get_meta(parenttype)
 
+	# Xác định tất cả các bảng con (doctypes) thông qua trường Table
+	child_tables = [
+		(df.fieldname, df.options)  # Bao gồm cả fieldname và options
+		for df in meta.fields
+		if df.fieldtype in ["Table"] and df.options
+	]
 
-	# Tạo cấu trúc dữ liệu cho columns từ các trường động( nghi ngờ là sai ở đây)
-	columns = []
-	for field in fields:
-		field_meta = frappe.get_meta(doctype).get_field(field)
-		
-		if field_meta:  # Kiểm tra nếu field_meta không phải là None
+	result = []
+
+	for child_fieldname, child_doctype in child_tables:
+		# Nếu không có fields, lấy tất cả các trường
+		fields = [
+			d.fieldname
+			for d in frappe.get_meta(child_doctype).fields
+			if d.fieldtype not in ["Section Break", "Column Break", "Tab Break"]
+		]
+
+		# Lấy các bản ghi từ bảng con
+		records = frappe.get_all(
+			child_doctype,
+			filters={"parent": parent_name, "parenttype": parenttype},
+			fields=['*']
+		)
+
+		# Tạo cấu trúc dữ liệu cho columns
+		columns = []
+		for field in fields:
+			field_meta = frappe.get_meta(child_doctype).get_field(field)
 			columns.append({
 				"label": field_meta.label,
 				"key": field,
-				"fieldtype": field_meta.fieldtype
+				"fieldtype": field_meta.fieldtype,
+				"doctype": child_doctype
 			})
-		else:
-			frappe.log_error(f"Field '{field}' không tồn tại trong Doctype '{doctype}'", "Invalid Field")
-	
-	# Tạo rows từ các bản ghi
-	rows = []
-	for index, record in enumerate(records, start=1):
-		row = {field: record.get(field) for field in fields}
-		row["id"] = index  # Thêm row-key
-		rows.append(row)
 
-	return {
-		"columns": columns,
-		"rows": rows
-	}
+		# Thêm dữ liệu bảng con vào kết quả
+		result.append({
+			"doctype": child_doctype,
+			"child_fieldname": child_fieldname,  # Thêm fieldname đại diện cho bảng con
+			"columns": columns,
+			"rows": records
+		})
+
+	return result
 
 @frappe.whitelist()
 def add_child_record(id, doctype, parentfield, **fields):
